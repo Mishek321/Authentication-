@@ -1,4 +1,5 @@
 import db from "../db.js";
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
 const sendResponse = (res, status, message, data = null) => {
@@ -13,7 +14,7 @@ export const loginUser = async (req, res) => {
   }
 
   try {
-    const sql = "SELECT * FROM Auth WHERE email = ?";
+    const sql = "SELECT * FROM auth WHERE email = ?";
     db.query(sql, [email], async (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -31,16 +32,28 @@ export const loginUser = async (req, res) => {
         return sendResponse(res, 401, "Invalid credentials");
       }
 
+      // Generate JWT token
+      const token = jwt.sign(
+        { email: user.email },
+        'secret_key', // Secret key
+        { expiresIn: "1h" } // Token expiration time
+      );
+
+      res.cookie('token',token);
 
       return sendResponse(res, 200, "Login successful", { 
+        token,
         user: { id: user.id, username: user.username, email: user.email }
       });
     });
+
+
   } catch (error) {
     console.error("Error:", error);
     return sendResponse(res, 500, "Internal server error");
   }
 };
+
 
 export const registerUser = async (req, res) => {
   const { username, email, password } = req.body;
@@ -50,7 +63,7 @@ export const registerUser = async (req, res) => {
   }
 
   try {
-    const checkUserSql = "SELECT * FROM Auth WHERE email = ?";
+    const checkUserSql = "SELECT * FROM auth WHERE email = ?";
     db.query(checkUserSql, [email], async (err, results) => {
       if (err) {
         console.error("Database error:", err);
@@ -63,7 +76,7 @@ export const registerUser = async (req, res) => {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const insertUserSql = "INSERT INTO Auth (username, email, password) VALUES (?, ?, ?)";
+      const insertUserSql = "INSERT INTO auth (username, email, password) VALUES (?, ?, ?)";
       db.query(insertUserSql, [username, email, hashedPassword], (err, result) => {
         if (err) {
           console.error("Database error:", err);
@@ -79,3 +92,51 @@ export const registerUser = async (req, res) => {
     return sendResponse(res, 500, "Internal server error");
   }
 };
+
+export const createBlog = (req,res)=>{
+
+  const sql = "INSERT into blog (title,`description`) VALUE (?,?)";
+
+  const value = req.body;
+
+  db.query(sql,[value.title, value.description],(err,result)=>{
+    if(err) return res.status(500).send(err);
+    return res.status(200).send({message: "value inserted...", result})
+  })
+}
+
+export const getBlog = (req, res)=>{
+  const sql = "SELECT * from blog"
+
+  db.query(sql,(err,result)=>{
+      if(err) return res.status(500).send(err);
+      return res.status(200).send({message:"get details", result})
+  });
+};
+
+
+export const deleteBlog = (req,res)=>{
+
+  const {id} = req.params;
+
+  const sql = "DELETE from blog WHERE id = ?";
+
+  db.query(sql,id,(err,result)=>{
+      if(err) return res.status(500).send(err);
+      return res.status(200).send({message: "value deleted", result})
+  })
+};
+
+
+export const updateBlog = (req,res)=>{
+    
+    const sql ="UPDATE blog set title = ?, description = ? WHERE id = ?";
+    const value = req.body
+    console.log(value);
+
+    db.query(sql,[value.title, value.description, value.id],(err,result)=>{
+        if(err) return res.status(500).send(err);
+        return res.status(200).send({message: "Value Updated", result})
+    })
+
+}
